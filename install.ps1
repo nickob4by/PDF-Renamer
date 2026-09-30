@@ -20,13 +20,36 @@ if (Get-Command python -ErrorAction SilentlyContinue) {
     $pyCmd = "python"
 } elseif (Get-Command py -ErrorAction SilentlyContinue) {
     $pyCmd = "py"
+} elseif (Test-Path "$env:LOCALAPPDATA\Programs\Python\Python312\python.exe") {
+    $pyCmd = "$env:LOCALAPPDATA\Programs\Python\Python312\python.exe"
+    $env:Path = "$env:LOCALAPPDATA\Programs\Python\Python312;$env:LOCALAPPDATA\Programs\Python\Python312\Scripts;" + $env:Path
 }
 
 if (-not $pyCmd) {
-    Write-Host "[ERROR] Python was not found in your system PATH." -ForegroundColor Red
-    Write-Host "Please install Python 3.10 - 3.12 (64-bit) from: https://www.python.org/downloads/"
-    Write-Host "IMPORTANT: Check 'Add Python to PATH' during installation." -ForegroundColor Yellow
-    exit 1
+    Write-Host "[INFO] Python was not found on this system." -ForegroundColor Yellow
+    Write-Host "[SETUP] Automatically downloading official Python 3.12 (64-bit)..." -ForegroundColor Yellow
+    $pyInstallerUrl = "https://www.python.org/ftp/python/3.12.9/python-3.12.9-amd64.exe"
+    $pyInstallerPath = Join-Path $PSScriptRoot "python_installer.exe"
+
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+    Invoke-WebRequest -Uri $pyInstallerUrl -OutFile $pyInstallerPath
+
+    Write-Host "[SETUP] Installing Python 3.12 quietly..." -ForegroundColor Yellow
+    Start-Process -FilePath $pyInstallerPath -ArgumentList "/quiet InstallAllUsers=0 PrependPath=1 Include_pip=1" -Wait
+    Remove-Item $pyInstallerPath -Force -ErrorAction SilentlyContinue
+
+    $env:Path = "$env:LOCALAPPDATA\Programs\Python\Python312;$env:LOCALAPPDATA\Programs\Python\Python312\Scripts;" + $env:Path
+    if (Test-Path "$env:LOCALAPPDATA\Programs\Python\Python312\python.exe") {
+        $pyCmd = "$env:LOCALAPPDATA\Programs\Python\Python312\python.exe"
+    } elseif (Get-Command python -ErrorAction SilentlyContinue) {
+        $pyCmd = "python"
+    }
+
+    if (-not $pyCmd) {
+        Write-Host "[ERROR] Python installation completed but executable was not found. Please restart install.ps1" -ForegroundColor Red
+        exit 1
+    }
+    Write-Host "[OK] Python installed successfully!" -ForegroundColor Green
 }
 
 $pyVer = & $pyCmd --version

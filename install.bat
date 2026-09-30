@@ -16,35 +16,76 @@ REM -------------------------------------------------------------------
 set "PYTHON_CMD="
 where python >nul 2>&1
 if %errorlevel% equ 0 set "PYTHON_CMD=python"
+
 if not defined PYTHON_CMD (
     where py >nul 2>&1
     if %errorlevel% equ 0 set "PYTHON_CMD=py"
 )
 
-if not defined PYTHON_CMD goto :no_python
+REM Check default user installation path
+if not defined PYTHON_CMD (
+    if exist "%LOCALAPPDATA%\Programs\Python\Python312\python.exe" (
+        set "PYTHON_CMD=%LOCALAPPDATA%\Programs\Python\Python312\python.exe"
+        set "PATH=%LOCALAPPDATA%\Programs\Python\Python312;%LOCALAPPDATA%\Programs\Python\Python312\Scripts;!PATH!"
+    )
+)
 
+if not defined PYTHON_CMD (
+    if exist "C:\Python312\python.exe" (
+        set "PYTHON_CMD=C:\Python312\python.exe"
+        set "PATH=C:\Python312;C:\Python312\Scripts;!PATH!"
+    )
+)
+
+if defined PYTHON_CMD goto :python_ready
+
+:install_python
+echo [INFO] Python was not detected on this system.
+echo [SETUP] Automatically downloading official Python 3.12 [64-bit]...
+set "PY_INSTALLER=python_installer.exe"
+
+REM Download via curl or powershell
+curl.exe -L -o "%PY_INSTALLER%" "https://www.python.org/ftp/python/3.12.9/python-3.12.9-amd64.exe" 2>nul
+if not exist "%PY_INSTALLER%" (
+    powershell -NoProfile -ExecutionPolicy Bypass -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; (New-Object System.Net.WebClient).DownloadFile('https://www.python.org/ftp/python/3.12.9/python-3.12.9-amd64.exe', 'python_installer.exe')"
+)
+
+if not exist "%PY_INSTALLER%" (
+    echo [ERROR] Failed to download Python installer.
+    echo Please manually download and install Python 3.12 from:
+    echo   https://www.python.org/downloads/
+    pause
+    exit /b 1
+)
+
+echo [SETUP] Installing Python 3.12 quietly...
+start /wait %PY_INSTALLER% /quiet InstallAllUsers=0 PrependPath=1 Include_pip=1 Include_test=0 SimpleInstall=1
+del /f /q %PY_INSTALLER% >nul 2>&1
+
+REM Refresh PATH in current session
+set "PATH=%LOCALAPPDATA%\Programs\Python\Python312;%LOCALAPPDATA%\Programs\Python\Python312\Scripts;!PATH!"
+if exist "%LOCALAPPDATA%\Programs\Python\Python312\python.exe" (
+    set "PYTHON_CMD=%LOCALAPPDATA%\Programs\Python\Python312\python.exe"
+) else (
+    where python >nul 2>&1
+    if %errorlevel% equ 0 set "PYTHON_CMD=python"
+)
+
+if not defined PYTHON_CMD (
+    echo [WARNING] Python installation finished, but python.exe was not detected immediately.
+    echo Please restart install.bat to continue setup.
+    pause
+    exit /b 1
+)
+
+echo [OK] Python 3.12 installed successfully!
+echo.
+
+:python_ready
 echo [OK] Python found:
 %PYTHON_CMD% --version
 echo.
 goto :check_vcredist
-
-:no_python
-echo [ERROR] Python was not found in your system PATH.
-echo.
-echo Please install Python 3.10 - 3.12 [64-bit] from:
-echo   https://www.python.org/downloads/
-echo.
-echo IMPORTANT: Check the box "Add Python to PATH" during installation.
-echo.
-where winget >nul 2>&1
-if %errorlevel% equ 0 (
-    echo [INFO] Attempting automated installation via Windows winget...
-    winget install Python.Python.3.12 --accept-package-agreements --accept-source-agreements
-    echo.
-    echo If Python was just installed, please close and reopen this installer.
-)
-pause
-exit /b 1
 
 REM -------------------------------------------------------------------
 REM 2. Check Visual C++ Redistributable (x64)
