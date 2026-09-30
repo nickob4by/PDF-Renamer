@@ -80,7 +80,7 @@ Write-Host "[SETUP] Upgrading pip, setuptools, and wheel..." -ForegroundColor Ye
 Write-Host "[SETUP] Installing dependencies from requirements.txt..." -ForegroundColor Yellow
 Write-Host "This may take a few minutes (downloading PaddleOCR, PyMuPDF, FastAPI, etc.)..."
 $reqFile = Join-Path $PSScriptRoot "requirements.txt"
-& $venvPy -m pip install -r $reqFile
+& $venvPy -m pip install --no-cache-dir -r $reqFile
 Write-Host "[OK] All dependencies installed successfully!" -ForegroundColor Green
 Write-Host ""
 
