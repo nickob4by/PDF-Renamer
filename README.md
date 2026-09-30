@@ -50,27 +50,43 @@ git clone https://github.com/nickob4by/PDF-Renamer.git
 cd PDF-Renamer
 ```
 
-### 2. Create and Activate a Virtual Environment
+### Method 1: 1-Click Automatic Installer (Recommended for Windows)
 
-**On Windows (PowerShell):**
+Simply double-click **`install.bat`** (or execute `.\install.ps1` in PowerShell).
+
+The installer automatically handles everything:
+1. **Python Check**: Verifies Python 3.10–3.12 is installed (offers automatic setup via Windows `winget` if missing).
+2. **Visual C++ Check**: Detects and installs Microsoft Visual C++ 2015–2022 Redistributable (x64) if needed.
+3. **Virtual Environment**: Creates an isolated `venv` environment.
+4. **Package Installation**: Upgrades `pip` and installs all dependencies from `requirements.txt`.
+5. **Model Pre-warming**: Downloads and caches PaddleOCR recognition models ahead of time.
+6. **Launch Prompt**: Prompts to start the server immediately.
+
+---
+
+### Method 2: Manual Installation
+
+**1. Create and Activate a Virtual Environment:**
+
+*On Windows (PowerShell):*
 ```powershell
 python -m venv venv
 .\venv\Scripts\Activate.ps1
 ```
 
-**On Windows (Command Prompt):**
+*On Windows (Command Prompt):*
 ```cmd
 python -m venv venv
 venv\Scripts\activate.bat
 ```
 
-**On Linux / macOS:**
+*On Linux / macOS:*
 ```bash
 python3 -m venv venv
 source venv/bin/activate
 ```
 
-### 3. Install Dependencies
+**2. Install Dependencies:**
 ```bash
 pip install --upgrade pip
 pip install -r requirements.txt
@@ -80,15 +96,14 @@ pip install -r requirements.txt
 
 ## Running the Web Application
 
-Start the local server using Uvicorn:
+### Option A: Double-Click Launcher (Windows)
+Double-click **`start_server.bat`**. It will automatically use the virtual environment and open `http://localhost:8000` in your default browser.
+
+### Option B: Command Line
 ```bash
 python -m uvicorn app:app --host 0.0.0.0 --port 8000
 ```
-
-Once started, open your web browser and navigate to:
-```
-http://localhost:8000
-```
+Open your browser at **`http://localhost:8000`**.
 
 ---
 
