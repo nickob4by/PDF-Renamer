@@ -1,0 +1,40 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Pytest cache
+.pytest_cache/
+
+# Build & distribution artifacts
+dist/
+build/
+*.spec
+
+# Local runtime directories & outputs
+temp/
+scratch/
+logs/
+uploads/
+output/
+Failed/
+Unknown Billing Period/
+
+# Local configuration & cache
+config_state.json
+.freebuff/
+memory/
+
+# User files and artifacts
+*.pdf
+*.bak
+*.log
+~$*
+
+# Environments and IDE
+.env
+.venv/
+venv/
+ENV/
+.vscode/
+.idea/

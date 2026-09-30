@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PDF Auto Rename — DASURECO Invoice Processor</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="header-left">
+        <div class="header-badge"></div>
+        <div>
+          <h1 class="header-title">PDF Auto Rename</h1>
+          <p class="header-subtitle">OCR Invoice Renaming & Matching for DASURECO</p>
+        </div>
+      </div>
+      <div class="header-right">
+        <div class="status-indicator" id="serverStatusBadge">
+          <span class="dot idle" id="statusDot"></span>
+          <span id="serverStatusText">Idle</span>
+        </div>
+        <div class="timer-box">
+          <span class="timer-label">Elapsed</span>
+          <span class="timer-value" id="elapsedTimer">00:00</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Dry Run Notice Banner -->
+    <div class="dry-run-banner" id="dryRunBanner" style="display: none;">
+      ⚠️ <strong>DRY RUN MODE ENABLED</strong> — Preview only, no files will be written to Output or Failed folders.
+    </div>
+
+    <!-- Main Content Layout -->
+    <div class="app-grid">
+      <!-- Left Column: Input & Controls -->
+      <div class="col-left">
+
+        <!-- Card: Input Selection -->
+        <div class="card">
+          <div class="card-header">
+            <span class="step-num">1</span>
+            <h2>UPLOAD PDF INVOICES</h2>
+          </div>
+
+          <div class="dropzone" id="dropzone">
+            <div class="dropzone-icon">📄</div>
+            <p>Drag & Drop invoice PDF files here, or <label for="filePicker" class="file-browse-link">browse</label></p>
+            <input type="file" id="filePicker" multiple accept=".pdf" style="display:none" onchange="handleFileSelect(event)">
+            <span class="hint">Accepts single or multi-page PDF receipts</span>
+          </div>
+          <div class="button-row" style="margin-top: 10px;">
+            <button type="button" class="btn btn-ghost" onclick="clearUploadedFiles()">Clear List</button>
+          </div>
+          <ul class="file-list" id="uploadedFileList"></ul>
+        </div>
+
+        <!-- Card: Data Files & Configuration -->
+        <div class="card">
+          <div class="card-header">
+            <span class="step-num">2</span>
+            <h2>DATA FILES (MASTER & PERIODS)</h2>
+          </div>
+          <div class="data-file-row">
+            <div class="data-file-info">
+              <span class="data-file-name">Master Excel (FOR OR)</span>
+              <span class="data-file-status" id="masterStatus">Loaded (Default)</span>
+            </div>
+            <label class="btn btn-sm btn-ghost" for="masterPicker">Replace master.xlsx</label>
+            <input type="file" id="masterPicker" accept=".xlsx,.xls" style="display:none" onchange="uploadMaster(event)">
+          </div>
+          <div class="data-file-row">
+            <div class="data-file-info">
+              <span class="data-file-name">Billing Periods</span>
+              <span class="data-file-status" id="periodsStatus">billing_periods.txt</span>
+            </div>
+            <label class="btn btn-sm btn-ghost" for="periodsPicker">Replace periods.txt</label>
+            <input type="file" id="periodsPicker" accept=".txt" style="display:none" onchange="uploadPeriods(event)">
+          </div>
+        </div>
+
+        <!-- Card: Output Destination -->
+        <div class="card">
+          <div class="card-header">
+            <span class="step-num">3</span>
+            <h2>OUTPUT FOLDER</h2>
+            <button class="btn btn-sm btn-ghost" onclick="resetOutputDir()">Reset to Default</button>
+          </div>
+          <div class="folder-input-group">
+            <input type="text" id="outputFolderInput" class="text-input" placeholder="e.g. \\10.0.0.9\Accounting\Nicko\OR Renamer\Output or D:\Output">
+            <button type="button" class="btn btn-primary" onclick="openFolderBrowser()" style="white-space: nowrap;">
+              📁 Browse...
+            </button>
+          </div>
+          <div class="quick-paths">
+            <span class="quick-paths-label">Presets:</span>
+            <button type="button" class="btn btn-sm btn-ghost" onclick="setQuickPath('network')">🌐 Network Share</button>
+            <button type="button" class="btn btn-sm btn-ghost" onclick="setQuickPath('local')">📂 Project Output</button>
+            <button type="button" class="btn btn-sm btn-ghost" onclick="setQuickPath('desktop')">🖥️ Desktop</button>
+          </div>
+          <div class="hint" style="margin-top: 8px;">
+            Matched PDFs land here. Unmatched files go to <code>&lt;Output&gt;\Failed</code>, and unmapped billing periods go to <code>&lt;Output&gt;\Unknown Billing Period</code>.
+          </div>
+        </div>
+
+        <!-- Card: Execution Controls -->
+        <div class="card">
+          <div class="card-header">
+            <span class="step-num">4</span>
+            <h2>START PROCESSING</h2>
+          </div>
+          <div class="controls-row">
+            <button class="btn btn-success btn-lg" id="btnStart" onclick="startProcessing()">
+              ▶ Start Renaming
+            </button>
+            <button class="btn btn-danger btn-lg" id="btnCancel" onclick="cancelProcessing()" disabled>
+              ■ Cancel
+            </button>
+            <label class="checkbox-label">
+              <input type="checkbox" id="chkDryRun" onchange="toggleDryRun(event)">
+              Dry run (preview only)
+            </label>
+          </div>
+        </div>
+
+
+      </div>
+
+      <!-- Right Column: Progress & Activity Log -->
+      <div class="col-right">
+
+        <!-- Card: Progress Details -->
+        <div class="card">
+          <div class="card-header">
+            <h2>LIVE PROGRESS</h2>
+            <span class="progress-percent" id="progressPercent">0 / 0 (0%)</span>
+          </div>
+
+          <div class="progress-bar-container">
+            <div class="progress-bar-fill" id="progressBarFill" style="width: 0%;"></div>
+          </div>
+
+          <div class="current-item-box">
+            <div class="info-row">
+              <span class="info-label">Current File:</span>
+              <span class="info-val font-mono" id="currFile">—</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">Matched Company:</span>
+              <span class="info-val" id="currCompany">—</span>
+            </div>
+            <div class="info-row-grid">
+              <div>
+                <span class="info-label">Billing No:</span>
+                <span class="info-val font-mono" id="currBilling">—</span>
+              </div>
+              <div>
+                <span class="info-label">Billing Period:</span>
+                <span class="info-val font-mono" id="currPeriod">—</span>
+              </div>
+              <div>
+                <span class="info-label">Confidence:</span>
+                <span class="info-val font-mono" id="currConfidence">—</span>
+              </div>
+            </div>
+            <div class="info-row">
+              <span class="info-label">Saved As:</span>
+              <span class="info-val font-mono color-ok" id="currSavedAs">—</span>
+            </div>
+          </div>
+
+          <!-- Stat Counters Row -->
+          <div class="stat-grid">
+            <div class="stat-card">
+              <span class="stat-title">TOTAL PAGES</span>
+              <span class="stat-num color-accent" id="statTotal">0</span>
+            </div>
+            <div class="stat-card">
+              <span class="stat-title">SUCCESSFUL</span>
+              <span class="stat-num color-ok" id="statSuccess">0</span>
+            </div>
+            <div class="stat-card">
+              <span class="stat-title">FAILED</span>
+              <span class="stat-num color-err" id="statFailed">0</span>
+            </div>
+            <div class="stat-card">
+              <span class="stat-title">MANUAL REVIEW</span>
+              <span class="stat-num color-warn" id="statManual">0</span>
+            </div>
+          </div>
+
+          <div class="results-actions" id="resultsActions" style="display: none; margin-top: 12px;">
+            <a class="btn btn-primary" id="btnDownloadZip" href="/api/download-results" target="_blank">
+              📦 Download Renamed Files (ZIP)
+            </a>
+          </div>
+        </div>
+
+        <!-- Card: Activity Log -->
+        <div class="card log-card">
+          <div class="card-header">
+            <h2>ACTIVITY LOG</h2>
+            <div>
+              <button class="btn btn-sm btn-ghost" onclick="clearLog()">Clear Log</button>
+            </div>
+          </div>
+          <div class="log-stream" id="logStream">
+            <div class="log-entry dim">[System] Ready. Connect to start processing.</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
