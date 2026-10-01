@@ -64,6 +64,10 @@ async function fetchStatus() {
     if (data.is_running) {
       setRunningState(true);
     }
+    if (data.uploaded_files && Array.isArray(data.uploaded_files)) {
+      currentUploadedFiles = data.uploaded_files;
+      renderUploadedFileList();
+    }
     // Load presets in background
     fetch("/api/browse-folders")
       .then(r => r.json())
@@ -108,9 +112,10 @@ function initDropzone() {
 
 function handleFileSelect(event) {
   const files = event.target.files;
-  if (files.length > 0) {
+  if (files && files.length > 0) {
     uploadFiles(files);
   }
+  event.target.value = "";
 }
 
 let currentUploadedFiles = [];
@@ -484,11 +489,18 @@ function updateTimer() {
 // Activity Log Helper
 function appendLog(msg, type = "info") {
   const stream = document.getElementById("logStream");
+  if (!stream) return;
   const div = document.createElement("div");
   div.className = `log-entry ${type}`;
   const time = new Date().toLocaleTimeString();
   div.textContent = `[${time}] ${msg}`;
   stream.appendChild(div);
+
+  // Keep DOM lean to avoid browser lag when processing 500+ pages
+  while (stream.childElementCount > 250) {
+    stream.removeChild(stream.firstElementChild);
+  }
+
   stream.scrollTop = stream.scrollHeight;
 }
 

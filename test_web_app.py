@@ -44,9 +44,20 @@ def test_upload_pdfs():
 
 
 def test_download_results():
-    response = client.get("/api/download-results")
-    assert response.status_code == 200
-    assert response.headers["content-type"] == "application/zip"
+    from app import job_mgr
+    import tempfile
+    import shutil
+    test_out = Path(tempfile.mkdtemp(prefix="test_download_out_"))
+    (test_out / "sample.pdf").write_bytes(b"%PDF-1.4\n%%EOF")
+    old_out = job_mgr.last_output_dir
+    job_mgr.last_output_dir = test_out
+    try:
+        response = client.get("/api/download-results")
+        assert response.status_code == 200
+        assert response.headers["content-type"] == "application/zip"
+    finally:
+        job_mgr.last_output_dir = old_out
+        shutil.rmtree(test_out, ignore_errors=True)
 
 
 def test_upload_master_and_periods():

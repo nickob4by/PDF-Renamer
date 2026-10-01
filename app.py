@@ -194,6 +194,10 @@ async def get_status():
     except Exception:
         pass
 
+    uploaded_pdfs = []
+    if UPLOAD_DIR.exists():
+        uploaded_pdfs = sorted([p.name for p in UPLOAD_DIR.glob("*.pdf")])
+
     return {
         "status": "online",
         "is_running": job_mgr.is_running,
@@ -207,6 +211,7 @@ async def get_status():
         "active_master": job_mgr.active_master_name or str(job_mgr.active_master_path.name),
         "active_periods": job_mgr.active_periods_name or str(job_mgr.active_periods_path.name),
         "periods_count": periods_count,
+        "uploaded_files": uploaded_pdfs,
     }
 
 
@@ -672,16 +677,29 @@ async def cancel_job():
 async def download_results():
     """Package output directory into a ZIP archive for client download."""
     zip_buffer = io.BytesIO()
-    out_dir = job_mgr.last_output_dir if (job_mgr.last_output_dir and job_mgr.last_output_dir.exists()) else OUTPUT_DIR
+    
+    # Safely select directory with local fallback if UNC path is unreachable
+    out_dir = job_mgr.last_output_dir
+    try:
+        if not out_dir or not out_dir.exists():
+            out_dir = OUTPUT_DIR
+            if not out_dir.exists():
+                out_dir = BASE_DIR / "output"
+    except (OSError, Exception):
+        out_dir = BASE_DIR / "output"
+
     unknown_dir = out_dir / "Unknown Billing Period"
     failed_dir = out_dir / "Failed"
 
     with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
         for folder in (out_dir, unknown_dir, failed_dir):
-            if folder.exists():
-                for item in folder.glob("*.pdf"):
-                    arcname = os.path.relpath(item, out_dir)
-                    zip_file.write(item, arcname=arcname)
+            try:
+                if folder.exists():
+                    for item in folder.glob("*.pdf"):
+                        arcname = os.path.relpath(item, out_dir)
+                        zip_file.write(item, arcname=arcname)
+            except (OSError, Exception) as e:
+                print(f"Skipping folder {folder} during zip packaging: {e}")
 
     zip_buffer.seek(0)
     filename = f"Renamed_Invoices_{time.strftime('%Y%m%d_%H%M%S')}.zip"
