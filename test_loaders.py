@@ -21,6 +21,8 @@ def test_billing_periods_various_formats():
 SI_DASURECO__0005173_0223_2025
 SI_DASURECO_0006671_0323_2025
 SI_DASURECO__TS-WFP-227F73-0000086_0525_2026
+0044866_0825
+0046298_0925
 0055978 0426
 0054461: 0326
 """
@@ -35,6 +37,8 @@ SI_DASURECO__TS-WFP-227F73-0000086_0525_2026
         assert periods.get("TS-WFP-227F73-0000086") == "0525"
         # Suffix automatically indexed
         assert periods.get("0000086") == "0525"
+        assert periods.get("0044866") == "0825"
+        assert periods.get("0046298") == "0925"
         assert periods.get("0055978") == "0426"
         assert periods.get("0054461") == "0326"
     finally:

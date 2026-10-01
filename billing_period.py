@@ -45,29 +45,25 @@ def load_billing_periods(txt_path):
             if not line or line.startswith("#"):
                 continue
 
-            # Standard SI_DASURECO naming pattern:
-            # SI_DASURECO__<BILLING_NUMBER>_<PERIOD>_<YEAR>
-            # Matches single or multiple underscores
-            m = re.search(
-                r"SI_DASURECO_+([A-Za-z0-9\-]+)_(\d{4})", line, re.IGNORECASE
-            )
+            # Strip optional SI_DASURECO__ prefix (e.g. "SI_DASURECO__0044866_0825_20251114" -> "0044866_0825_20251114")
+            clean = re.sub(r"(?i)^SI_DASURECO_+", "", line).strip()
+
+            # Priority 1: Format with trailing date/year e.g. "0044866_0825_20251114" or "0044866_0825_2025"
+            m1 = re.match(r"^([A-Za-z0-9\-]+)[_\s,:;]+(\d{4})[_\s,:;]+\d{4,8}$", clean)
+            # Priority 2: Direct concise format e.g. "0044866_0825" or "0044866 0825"
+            m2 = re.match(r"^([A-Za-z0-9\-]+)[_\s,:;]+(\d{4})$", clean)
+            
+            m = m1 or m2
             if m:
                 billing_number = m.group(1).strip()
                 billing_period = m.group(2).strip()
             else:
-                # Delimited fallback (spaces, colons, commas, tabs, underscores)
-                # e.g. "0055978 0426", "0055978: 0426", "0055978,0426"
-                m2 = re.match(r"^([A-Za-z0-9\-]+)[\s,:_\-]+(\d{4})\b", line)
-                if m2:
-                    billing_number = m2.group(1).strip()
-                    billing_period = m2.group(2).strip()
+                parts = [p for p in line.split("_") if p]
+                if len(parts) >= 2:
+                    billing_number = parts[-2].strip()
+                    billing_period = parts[-1].strip()
                 else:
-                    parts = [p for p in line.split("_") if p]
-                    if len(parts) >= 2:
-                        billing_number = parts[-2].strip()
-                        billing_period = parts[-1].strip()
-                    else:
-                        continue
+                    continue
 
             periods[billing_number] = billing_period
 
