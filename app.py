@@ -168,7 +168,11 @@ async def serve_index():
     index_file = TEMPLATES_DIR / "index.html"
     if not index_file.exists():
         return JSONResponse({"error": "templates/index.html not found"}, status_code=404)
-    return FileResponse(index_file)
+    response = FileResponse(index_file)
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    return response
 
 
 # ---------------------------------------------------------------------------

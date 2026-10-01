@@ -213,13 +213,21 @@ async function removeUploadedFile(filename) {
 }
 
 async function clearUploadedFiles() {
+  appendLog("Clearing upload queue and purging server cache...", "info");
   try {
-    await fetch("/api/clear-uploads", { method: "POST" });
-  } catch (_) {}
+    const res = await fetch("/api/clear-uploads", { method: "POST" });
+    const data = await res.json();
+    appendLog(`Cleared ${data.cleared || 0} file(s) from server cache.`, "ok");
+  } catch (e) {
+    appendLog(`Clear cache notice: ${e.message}`, "dim");
+  }
 
   currentUploadedFiles = [];
   renderUploadedFileList();
-  appendLog("Cleared uploaded files queue and purged upload cache.", "dim");
+  const filePicker = document.getElementById("filePicker");
+  if (filePicker) {
+    filePicker.value = "";
+  }
 }
 
 // Master / Periods Upload
