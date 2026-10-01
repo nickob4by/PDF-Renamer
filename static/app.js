@@ -113,6 +113,8 @@ function handleFileSelect(event) {
   }
 }
 
+let currentUploadedFiles = [];
+
 async function uploadFiles(fileList) {
   const formData = new FormData();
   for (let i = 0; i < fileList.length; i++) {
@@ -130,26 +132,89 @@ async function uploadFiles(fileList) {
     });
     const data = await res.json();
 
-    const list = document.getElementById("uploadedFileList");
-    list.innerHTML = "";
+    // Merge uniquely into currentUploadedFiles
     data.files.forEach(f => {
-      const li = document.createElement("li");
-      li.textContent = f;
-      list.appendChild(li);
+      if (!currentUploadedFiles.includes(f)) {
+        currentUploadedFiles.push(f);
+      }
     });
 
-    selectedFilesCount = data.files.length;
-    appendLog(`Uploaded ${data.files.length} PDF file(s) ready for processing.`, "ok");
-    document.getElementById("btnStart").disabled = false;
+    renderUploadedFileList();
+    appendLog(`Uploaded ${data.files.length} PDF file(s). Total active in queue: ${currentUploadedFiles.length}.`, "ok");
+    document.getElementById("btnStart").disabled = currentUploadedFiles.length === 0;
   } catch (err) {
     appendLog(`Upload failed: ${err.message}`, "err");
   }
 }
 
-function clearUploadedFiles() {
-  document.getElementById("uploadedFileList").innerHTML = "";
-  selectedFilesCount = 0;
-  appendLog("Cleared uploaded files list.", "dim");
+function renderUploadedFileList() {
+  const list = document.getElementById("uploadedFileList");
+  if (!list) return;
+  list.innerHTML = "";
+
+  currentUploadedFiles.forEach((f, idx) => {
+    const li = document.createElement("li");
+    li.style.display = "flex";
+    li.style.justifyContent = "space-between";
+    li.style.alignItems = "center";
+    
+    const span = document.createElement("span");
+    span.textContent = f;
+    span.title = f;
+    span.style.overflow = "hidden";
+    span.style.textOverflow = "ellipsis";
+    span.style.whiteSpace = "nowrap";
+
+    const removeBtn = document.createElement("button");
+    removeBtn.type = "button";
+    removeBtn.innerHTML = "&times;";
+    removeBtn.title = "Remove file";
+    removeBtn.style.background = "none";
+    removeBtn.style.border = "none";
+    removeBtn.style.color = "#e74c3c";
+    removeBtn.style.cursor = "pointer";
+    removeBtn.style.fontSize = "16px";
+    removeBtn.style.fontWeight = "bold";
+    removeBtn.style.padding = "0 6px";
+    removeBtn.onclick = (e) => {
+      e.stopPropagation();
+      removeUploadedFile(f);
+    };
+
+    li.appendChild(span);
+    li.appendChild(removeBtn);
+    list.appendChild(li);
+  });
+
+  selectedFilesCount = currentUploadedFiles.length;
+  const btnStart = document.getElementById("btnStart");
+  if (btnStart) {
+    btnStart.disabled = selectedFilesCount === 0;
+  }
+}
+
+async function removeUploadedFile(filename) {
+  try {
+    await fetch("/api/remove-upload", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ filename })
+    });
+  } catch (_) {}
+
+  currentUploadedFiles = currentUploadedFiles.filter(f => f !== filename);
+  renderUploadedFileList();
+  appendLog(`Removed file: ${filename}`, "dim");
+}
+
+async function clearUploadedFiles() {
+  try {
+    await fetch("/api/clear-uploads", { method: "POST" });
+  } catch (_) {}
+
+  currentUploadedFiles = [];
+  renderUploadedFileList();
+  appendLog("Cleared uploaded files queue and purged upload cache.", "dim");
 }
 
 // Master / Periods Upload
@@ -293,7 +358,8 @@ async function startProcessing() {
       body: JSON.stringify({
         source: "upload",
         dry_run: dryRun,
-        output_dir: outputFolderVal || null
+        output_dir: outputFolderVal || null,
+        files: currentUploadedFiles
       })
     });
     const data = await res.json();

@@ -393,6 +393,38 @@ async def upload_pdfs(files: list[UploadFile] = File(...)):
     return {"uploaded": len(saved_files), "files": saved_files}
 
 
+class RemoveUploadRequest(BaseModel):
+    filename: str
+
+
+@app.post("/api/remove-upload")
+async def remove_upload(req: RemoveUploadRequest):
+    """Remove a specific uploaded PDF file from UPLOAD_DIR."""
+    fname = Path(req.filename).name  # Prevent directory traversal
+    target = UPLOAD_DIR / fname
+    if target.is_file() and target.suffix.lower() == ".pdf":
+        try:
+            target.unlink()
+            return {"removed": True, "filename": fname}
+        except Exception as e:
+            return JSONResponse({"error": f"Failed to delete {fname}: {str(e)}"}, status_code=500)
+    return {"removed": False, "filename": fname, "message": "File not found"}
+
+
+@app.post("/api/clear-uploads")
+async def clear_uploads():
+    """Purge all uploaded PDF files from UPLOAD_DIR while keeping master excel and periods txt."""
+    deleted = []
+    if UPLOAD_DIR.exists():
+        for p in UPLOAD_DIR.glob("*.pdf"):
+            try:
+                p.unlink()
+                deleted.append(p.name)
+            except Exception as e:
+                print(f"Error removing {p.name}: {e}")
+    return {"cleared": len(deleted), "files": deleted}
+
+
 @app.post("/api/upload-master")
 async def upload_master(file: UploadFile = File(...)):
     """Upload a new master Excel file with Excel file-lock tolerance."""
@@ -516,6 +548,7 @@ class StartJobRequest(BaseModel):
     source: str = "upload"  # "upload"
     dry_run: bool = False
     output_dir: Optional[str] = None
+    files: Optional[list[str]] = None
 
 
 @app.post("/api/start")
@@ -545,7 +578,16 @@ async def start_job(req: StartJobRequest):
 
     # Determine input PDF files
     if req.source == "upload":
-        pdf_files = sorted(UPLOAD_DIR.glob("*.pdf"))
+        if req.files:
+            # Use strictly the user-specified files that exist in UPLOAD_DIR
+            pdf_files = []
+            for fname in req.files:
+                safe_name = Path(fname).name
+                p = UPLOAD_DIR / safe_name
+                if p.is_file() and p.suffix.lower() == ".pdf":
+                    pdf_files.append(p)
+        else:
+            pdf_files = sorted(UPLOAD_DIR.glob("*.pdf"))
     else:
         if not INPUT_DIR.exists():
             return JSONResponse(

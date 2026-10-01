@@ -18,6 +18,16 @@ sys.path.insert(0, str(ROOT))
 from matcher import normalize_company_name, ReceiptMatcher  # noqa: E402
 
 matcher = ReceiptMatcher()
+# Ensure JOBIN test fixture record is present in matcher for unit testing
+if not any(r.get("stl_id") == "JOBIN" for r in matcher.records):
+    matcher.records.append({
+        "stl_id": "JOBIN",
+        "name": "JOBIN \u2013SQM INC.",
+        "billing_number": "0058469",
+        "raw_billing": "TS-WAD-234F207-0058469",
+        "amount": 0.18
+    })
+    matcher.amount_index = matcher._build_amount_index()
 
 
 def test_ascii_dash_stripped():

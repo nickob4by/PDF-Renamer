@@ -141,6 +141,9 @@ def test_start_with_custom_output_dir(tmp_path=None):
     assert data["output_dir"] == str(custom_out)
     assert custom_out.exists()
     assert (custom_out / "Failed").exists()
+    from app import job_mgr
+    job_mgr.is_running = False
+    job_mgr.cancel_flag.set()
 
 
 def test_browse_folders():
@@ -183,6 +186,55 @@ def test_browse_native():
         app_module.open_native_folder_dialog = old_func
 
 
+def test_remove_and_clear_uploads():
+    from app import UPLOAD_DIR
+    sample_pdf_bytes = b"%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj 2 0 obj<</Type/Pages/Count 0>>endobj\nxref\n0 3\n0000000000 65535 f\n0000000010 00000 n\n0000000053 00000 n\ntrailer<</Size 3/Root 1 0 R>>\nstartxref\n102\n%%EOF\n"
+    
+    # Upload 2 test files
+    client.post(
+        "/api/upload-pdfs",
+        files=[
+            ("files", ("test_rm_1.pdf", sample_pdf_bytes, "application/pdf")),
+            ("files", ("test_rm_2.pdf", sample_pdf_bytes, "application/pdf")),
+        ]
+    )
+    assert (UPLOAD_DIR / "test_rm_1.pdf").exists()
+    assert (UPLOAD_DIR / "test_rm_2.pdf").exists()
+
+    # Test single remove
+    res = client.post("/api/remove-upload", json={"filename": "test_rm_1.pdf"})
+    assert res.status_code == 200
+    assert res.json()["removed"] is True
+    assert not (UPLOAD_DIR / "test_rm_1.pdf").exists()
+    assert (UPLOAD_DIR / "test_rm_2.pdf").exists()
+
+    # Test clear uploads
+    res = client.post("/api/clear-uploads")
+    assert res.status_code == 200
+    assert not (UPLOAD_DIR / "test_rm_2.pdf").exists()
+
+
+def test_start_with_selective_files():
+    from app import UPLOAD_DIR, job_mgr
+    job_mgr.is_running = False
+    job_mgr.cancel_flag.clear()
+    sample_pdf_bytes = b"%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj 2 0 obj<</Type/Pages/Count 0>>endobj\nxref\n0 3\n0000000000 65535 f\n0000000010 00000 n\n0000000053 00000 n\ntrailer<</Size 3/Root 1 0 R>>\nstartxref\n102\n%%EOF\n"
+    (UPLOAD_DIR / "dummy_selected.pdf").write_bytes(sample_pdf_bytes)
+
+    res = client.post(
+        "/api/start",
+        json={"source": "upload", "dry_run": True, "files": ["dummy_selected.pdf"]}
+    )
+    assert res.status_code == 200
+    assert res.json()["status"] == "started"
+    job_mgr.is_running = False
+    job_mgr.cancel_flag.set()
+
+    # Clean up
+    if (UPLOAD_DIR / "dummy_selected.pdf").exists():
+        (UPLOAD_DIR / "dummy_selected.pdf").unlink()
+
+
 def main():
     tests = [
         test_index_page,
@@ -195,6 +247,8 @@ def main():
         test_browse_folders,
         test_create_folder,
         test_browse_native,
+        test_remove_and_clear_uploads,
+        test_start_with_selective_files,
     ]
 
 
